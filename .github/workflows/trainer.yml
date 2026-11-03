@@ -5,12 +5,11 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# The key is the fence. contents: read lets the trainer read code and comments
-# and *create* commit comments, but not push, edit, or delete anything, so its
-# record of past reviews is append-only. Nothing here depends on the game's own
-# build passing.
-permissions:
-  contents: read
+# Each job below asks for its own key. GitHub has no key that can post a commit
+# comment without also being able to push, so the agent and that key never meet:
+# review runs the agent read-only, and post only publishes what review printed.
+# Nothing here depends on the game's own build passing.
+permissions: {}
 
 # A newer push makes an older review moot.
 concurrency:
@@ -20,6 +19,10 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.token.outputs.ready }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,8 +44,11 @@ jobs:
         run: |
           npm install --global @opencode/cli
           mkdir -p ~/.config/opencode && echo '{"update":"disable"}' > ~/.config/opencode/opencode.json
+      # The agent's final answer goes to stdout and becomes the comment; its
+      # tool activity goes to stderr and stays in this log as technical detail.
       - name: Review this push
         if: steps.token.outputs.ready == 'true'
+        shell: bash
         run: |
           case "$BEFORE" in
             ""|*[!0]*) ;;
@@ -50,32 +56,38 @@ jobs:
           esac
           opencode run --standalone --agent trainer \
             "Review the push ending at ${GITHUB_SHA} in ${GITHUB_REPOSITORY}. Previous head: ${BEFORE:-none, review the repository as it stands}." \
-            | tee trainer-output.txt
+            | tee "$RUNNER_TEMP/review.md"
+          if [ ! -s "$RUNNER_TEMP/review.md" ]; then
+            echo "::error title=Trainer wrote nothing::If the log shows a 401, run deno task trainer:setup again."
+            exit 1
+          fi
         env:
           TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
-      # Green means the trainer delivered a review, whatever the review says.
-      # Red means only that the trainer itself failed. The comment is the main
-      # outcome; this page keeps the technical detail.
-      - name: Confirm the review was posted
+      - uses: actions/upload-artifact@v4
         if: steps.token.outputs.ready == 'true'
+        with:
+          name: trainer-review
+          path: ${{ runner.temp }}/review.md
+          retention-days: 1
+
+  # Green means a review was delivered, whatever it says. Red means only that the
+  # trainer itself failed. The comment is the main outcome; the run keeps the detail.
+  post:
+    needs: review
+    if: needs.review.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: trainer-review
+      - name: Comment on the commit
         run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" \
-            --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .html_url // empty')
-          if [ -z "$url" ]; then
-            echo "::error title=Trainer posted nothing::No comment on this commit. If the log shows a 401, run deno task trainer:setup again."
-            exit 1
-          fi
-          {
-            echo "**[Read the trainer's review on this commit]($url)**"
-            echo
-            echo "<details><summary>Agent output</summary>"
-            echo
-            cat trainer-output.txt
-            echo
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
+          url=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@review.md --jq .html_url)
+          echo "**[Read the trainer's review on this commit]($url)**" >> "$GITHUB_STEP_SUMMARY"
         env:
           GH_TOKEN: ${{ github.token }}

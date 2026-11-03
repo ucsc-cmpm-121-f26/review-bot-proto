@@ -43,8 +43,8 @@ No BayLeaf access? Any OpenAI-compatible service works: also set
 
 On GitHub, the agent in [`.opencode/agents/trainer.md`](.opencode/agents/trainer.md)
 decides what to read: anything in your repository, its Git history, and comments
-on its commits can reach the model. Its GitHub key can read and add commit
-comments, but cannot push, edit, or delete anything. At your desk,
+on its commits can reach the model. Its GitHub key is read-only: a separate job,
+with no model in it, posts the agent's final message as the comment. At your desk,
 [`trainer/review.ts`](trainer/review.ts) sends a fixed bundle instead: the spec,
 your last 20 commit subjects, the diff being reviewed, and the files in `src/`.
 [`trainer/SPEC.md`](trainer/SPEC.md), [`trainer/POLICY.md`](trainer/POLICY.md),
