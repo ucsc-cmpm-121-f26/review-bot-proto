@@ -1,6 +1,6 @@
 # Spec: Firefly Catch
 
-What the software should do. The trainer compares the code with this list.
+What the software should do. The review bot compares the code with this list.
 
 1. A player square moves with the arrow keys or WASD and cannot leave the
    playfield.

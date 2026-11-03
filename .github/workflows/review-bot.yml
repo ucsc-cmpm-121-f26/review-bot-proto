@@ -1,17 +1,17 @@
 # ==============================================================================
-# WANT TO OPT OUT OF THE TRAINER? It's your choice. Do either one:
+# WANT TO OPT OUT OF THE REVIEW BOT? It's your choice. Do either one:
 #
 #   Turn it off: below, under "jobs:" and "review:", change "if: true" to
 #                "if: false". Change it back whenever you like.
 #
-#   Remove it:   delete this file. To remove all of it, also delete the trainer/
+#   Remove it:   delete this file. To remove all of it, also delete the review-bot/
 #                and .opencode/ folders and opencode.jsonc. Your game doesn't use
 #                them.
 #
 # Until you opt out or finish setting up (see README.md), every push gets a reminder
 # comment and a red X on this workflow. Your game isn't affected.
 # ==============================================================================
-name: Trainer
+name: Review Bot
 
 on:
   push:
@@ -22,13 +22,13 @@ permissions: {}
 
 # A newer push makes an older review moot.
 concurrency:
-  group: trainer-${{ github.ref }}
+  group: review-bot-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # The model runs here, on a machine with no key that can change the repository.
   review:
-    if: true # OPT OUT: change true to false to turn the trainer off.
+    if: true # OPT OUT: change true to false to turn the review bot off.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -41,7 +41,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Anyone can comment on a public commit, so only the trainer's own comments
+      # Anyone can comment on a public commit, so only the review bot's own comments
       # and those of people with access to this repository reach the model.
       - name: Collect past reviews and replies
         run: >
@@ -56,29 +56,29 @@ jobs:
         id: model
         run: |
           status=$(curl -s -o /dev/null -w '%{http_code}' https://api.bayleaf.dev/v1/chat/completions \
-            -H "Authorization: Bearer $TRAINER_TOKEN" -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $REVIEW_BOT_TOKEN" -H 'Content-Type: application/json' \
             -d '{"model":"openrouter:z-ai/glm-5.3-flash","max_tokens":16,"messages":[{"role":"user","content":"Hi"}]}') || status=none
-          [ -n "$TRAINER_TOKEN" ] || status=missing
+          [ -n "$REVIEW_BOT_TOKEN" ] || status=missing
           case "$status" in
             200) echo "ready=true" >> "$GITHUB_OUTPUT"; exit 0 ;;
-            missing) reason="this repository has no TRAINER_TOKEN secret." ;;
+            missing) reason="this repository has no REVIEW_BOT_TOKEN secret." ;;
             401) reason="its token has expired or was revoked." ;;
             403) reason="its token doesn't include the model it needs." ;;
             429) reason="your BayLeaf allowance is used up for now. This usually fixes itself within a day, with no steps needed." ;;
             *) reason="BayLeaf didn't answer as expected (status $status). If the steps below don't help, try again later." ;;
           esac
-          sed -e "s|REASON|$reason|" -e "s|REPOSITORY|$GITHUB_REPOSITORY|" trainer/SETUP-HELP.md > review.md
+          sed -e "s|REASON|$reason|" -e "s|REPOSITORY|$GITHUB_REPOSITORY|" review-bot/SETUP-HELP.md > review.md
         env:
-          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
+          REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
       # A push starts every workflow at once, so wait for the others and keep the
-      # logs of any that fail for the trainer to read. Empty means they all passed.
+      # logs of any that fail for the review bot to read. Empty means they all passed.
       - name: Wait for this commit's other workflows
         if: steps.model.outputs.ready == 'true'
         run: |
           sleep 15
           : > ci-output.txt
           others=$(gh run list --commit "$GITHUB_SHA" --json databaseId,workflowName \
-            --jq '.[] | select(.workflowName != "Trainer") | .databaseId')
+            --jq '.[] | select(.workflowName != "Review Bot") | .databaseId')
           for run in $others; do
             gh run watch "$run" --exit-status > /dev/null && continue
             gh run view "$run" --log-failed >> ci-output.txt || true
@@ -90,9 +90,9 @@ jobs:
         run: npm install --global @opencode/cli
       - name: Review this push
         if: steps.model.outputs.ready == 'true'
-        run: opencode run --standalone --agent trainer "Review the push from $BEFORE to $GITHUB_SHA."
+        run: opencode run --standalone --agent review-bot "Review the push from $BEFORE to $GITHUB_SHA."
         env:
-          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
+          REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
       - name: Check a review was written
@@ -127,5 +127,5 @@ jobs:
       - name: Stay red until set up or opted out
         if: needs.review.outputs.ready != 'true'
         run: |
-          echo "::error title=Trainer not set up::Finish setup or opt out. The comment on this commit explains both."
+          echo "::error title=Review bot not set up::Finish setup or opt out. The comment on this commit explains both."
           exit 1

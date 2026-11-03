@@ -1,4 +1,4 @@
-// Gets your trainer a token: deno task trainer:setup
+// Gets your review bot a token: deno task review-bot:setup
 //
 // You approve on BayLeaf in your browser. BayLeaf sends a one-time code back to
 // a tiny server this script runs on your own machine, and the script trades that
@@ -23,7 +23,7 @@ const server = Deno.serve({ hostname: "127.0.0.1", port: 0, onListen() {} }, (re
   if (params.get("state") !== state) return new Response("Wrong state.", { status: 400 });
   const received = params.get("code");
   if (!received) {
-    console.error("Not approved. Run deno task trainer:setup to try again.");
+    console.error("Not approved. Run deno task review-bot:setup to try again.");
     Deno.exit(1);
   }
   receiveCode(received);
@@ -44,7 +44,7 @@ async function post(path: string, body: unknown) {
   return response.json();
 }
 
-const { client_id } = await post("/grants/clients", { client_name: "Trainer", redirect_uri });
+const { client_id } = await post("/grants/clients", { client_name: "Review bot", redirect_uri });
 const approval = new URLSearchParams({
   client_id,
   response_type: "code",
@@ -70,7 +70,7 @@ const grant = await post("/grants/token", {
 let saved = false;
 try {
   const gh = new Deno.Command("gh", {
-    args: ["secret", "set", "TRAINER_TOKEN"],
+    args: ["secret", "set", "REVIEW_BOT_TOKEN"],
     stdin: "piped",
   }).spawn();
   const writer = gh.stdin.getWriter();
@@ -80,13 +80,13 @@ try {
 } catch { /* the GitHub CLI is not installed */ }
 
 if (saved) {
-  console.log("Saved as your repository's TRAINER_TOKEN secret. Push a commit to get a review.");
+  console.log("Saved as your repository's REVIEW_BOT_TOKEN secret. Push a commit to get a review.");
 } else {
   console.log(
     "Could not save it with the GitHub CLI. Treat this token like a password:\n\n" +
       `${grant.access_token}\n\n` +
       "On GitHub, go to Settings > Secrets and variables > Actions > New repository secret,\n" +
-      "and save it with the name TRAINER_TOKEN.",
+      "and save it with the name REVIEW_BOT_TOKEN.",
   );
 }
 Deno.exit(0);

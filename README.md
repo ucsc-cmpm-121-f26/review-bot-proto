@@ -1,38 +1,38 @@
-# Firefly Catch (trainer prototype)
+# Firefly Catch (review bot prototype)
 
-A tiny web game with a **trainer**: an AI that reviews every push to `main`
-against [`trainer/SPEC.md`](trainer/SPEC.md) and posts a public comment on your
-commit. The trainer's feedback is practice, separate from anything course staff
+A tiny web game with a **review bot**: an AI that reviews every push to `main`
+against [`review-bot/SPEC.md`](review-bot/SPEC.md) and posts a public comment on your
+commit. The review bot's feedback is practice, separate from anything course staff
 evaluate.
 
 Install [Deno](https://docs.deno.com/runtime/getting_started/installation/)
 and [Git](https://git-scm.com/downloads), create your own repository from this
 template, clone it, and run `deno task dev`.
 
-## Set up your trainer
+## Set up your review bot
 
 ```sh
-deno task trainer:setup
+deno task review-bot:setup
 ```
 
 Open the link it prints and approve a 30-day token on BayLeaf. If the
 [GitHub CLI](https://cli.github.com/) is installed and logged in, the script
-saves the token as your repository's `TRAINER_TOKEN` secret; otherwise it shows
+saves the token as your repository's `REVIEW_BOT_TOKEN` secret; otherwise it shows
 you how to add it by hand. On a remote machine such as a Codespace, the approval
 can't reach the script: follow the browser steps in
-[`trainer/SETUP-HELP.md`](trainer/SETUP-HELP.md) instead.
+[`review-bot/SETUP-HELP.md`](review-bot/SETUP-HELP.md) instead.
 
 Push a commit, wait a couple of minutes, and read the comment on that commit. To
-answer the trainer, reply to its comment; the next review reads your reply.
+answer the review bot, reply to its comment; the next review reads your reply.
 
-If the token is missing or has expired, the **Trainer** run goes red and the comment
+If the token is missing or has expired, the **Review Bot** run goes red and the comment
 on your commit says how to fix it, in your browser if you prefer. Red means you
 got no review, never that your code did badly.
 
 ## Opt out
 
-The trainer is yours to turn off. In
-[`.github/workflows/trainer.yml`](.github/workflows/trainer.yml), change
+The review bot is yours to turn off. In
+[`.github/workflows/review-bot.yml`](.github/workflows/review-bot.yml), change
 `if: true` to `if: false`, or delete that file. The comment at the top of the file
 explains both. Until you finish setup or opt out, every push gets a reminder
 comment and a red X.
@@ -41,12 +41,12 @@ comment and a red X.
 
 It's all in a few short files, yours to read and change:
 
-- [`.github/workflows/trainer.yml`](.github/workflows/trainer.yml) runs on each
+- [`.github/workflows/review-bot.yml`](.github/workflows/review-bot.yml) runs on each
   push: one job runs the model, a separate job posts its review.
-- [`.opencode/agents/trainer.md`](.opencode/agents/trainer.md) is the agent's
+- [`.opencode/agents/review-bot.md`](.opencode/agents/review-bot.md) is the agent's
   instructions and what it may do. [`opencode.jsonc`](opencode.jsonc) names the model.
-- [`trainer/SPEC.md`](trainer/SPEC.md) is what the software should do.
-- [`trainer/POLICY.md`](trainer/POLICY.md) is how the trainer should talk to you.
+- [`review-bot/SPEC.md`](review-bot/SPEC.md) is what the software should do.
+- [`review-bot/POLICY.md`](review-bot/POLICY.md) is how the review bot should talk to you.
 
 **What reaches the model:** your repository, its Git history, failure logs from
 its other workflows, and earlier reviews

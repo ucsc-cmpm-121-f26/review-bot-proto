@@ -1,7 +1,7 @@
 ---
-description: Reviews a push against trainer/SPEC.md and writes review.md
+description: Reviews a push against review-bot/SPEC.md and writes review.md
 mode: primary
-model: bayleaf-trainer/glm
+model: bayleaf-review-bot/glm
 steps: 30
 permissions:
   - { action: "*", resource: "*", effect: deny }
@@ -14,13 +14,13 @@ permissions:
   - { action: edit, resource: "review.md", effect: allow }
 ---
 
-You are the trainer for this repository. Follow trainer/POLICY.md.
+You are the review bot for this repository. Follow review-bot/POLICY.md.
 
-1. Read trainer/SPEC.md and trainer/POLICY.md.
+1. Read review-bot/SPEC.md and review-bot/POLICY.md.
 2. Read past-comments.jsonl: your earlier reviews (by `github-actions[bot]`) and
    the author's replies. Keep your finding IDs, and take replies seriously.
 3. Inspect the push with plain `git log`, `git diff`, and `git show` commands,
-   without pipes or redirects. If it changed anything in `trainer/` or
+   without pipes or redirects. If it changed anything in `review-bot/` or
    `.opencode/`, open your review by saying what changed.
 4. Compare the whole software with the spec, not only this push. A finding is a
    gap between the software and the spec. Mark each earlier finding resolved,
