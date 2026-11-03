@@ -5,7 +5,10 @@
 
 const BASE_URL = Deno.env.get("TRAINER_BASE_URL") ?? "https://api.bayleaf.dev/v1";
 const MODEL = Deno.env.get("TRAINER_MODEL") ?? "openrouter:z-ai/glm-5.3-flash";
-const TOKEN = Deno.env.get("TRAINER_TOKEN") ?? "";
+// CI passes the token as a secret; at your desk, deno task trainer:setup saved it in .env.
+const TOKEN = Deno.env.get("TRAINER_TOKEN") ??
+  (await Deno.readTextFile(".env").catch(() => "")).match(/^TRAINER_TOKEN=(.+)$/m)?.[1]?.trim() ??
+  "";
 const IN_CI = Deno.env.get("GITHUB_ACTIONS") === "true";
 const MAX_DIFF_CHARS = 40_000;
 const MAX_FILE_CHARS = 12_000;
@@ -64,13 +67,13 @@ async function sourceFiles(): Promise<string> {
 }
 
 if (!TOKEN) {
-  const setup = "No TRAINER_TOKEN found. See 'Set up your trainer' in README.md.";
+  const setup = "No TRAINER_TOKEN found. Run deno task trainer:setup (see README.md).";
   // Opt-in: an unconfigured trainer warns instead of failing your push.
   if (IN_CI) {
     console.log(`::warning title=Trainer not set up::${setup}`);
     Deno.exit(0);
   }
-  stop(`${setup}\nAt your desk: TRAINER_TOKEN=sk-bayleaf-grant-... deno task review`);
+  stop(setup);
 }
 
 const [spec, policy, log, changes, files] = await Promise.all([
@@ -100,8 +103,8 @@ const response = await fetch(`${BASE_URL}/chat/completions`, {
 if (response.status === 401) {
   stop(
     "Your trainer token expired or was revoked (tokens last at most 30 days, and " +
-      "regenerating your BayLeaf API key revokes them). Create a new one at " +
-      "https://api.bayleaf.dev/dashboard and update the TRAINER_TOKEN secret.",
+      "regenerating your BayLeaf API key revokes them). Run deno task trainer:setup " +
+      "to get a new one.",
   );
 }
 if (response.status === 403) {

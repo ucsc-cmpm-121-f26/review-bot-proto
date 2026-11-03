@@ -11,23 +11,26 @@ template, clone it, and run `deno task dev`.
 
 ## Set up your trainer
 
-1. Sign in at <https://api.bayleaf.dev/dashboard>. Under **Temporary inference
-   tokens**, create a token for `openrouter:z-ai/glm-5.3-flash` lasting 30 days,
-   and copy it.
-2. In your GitHub repository: **Settings → Secrets and variables → Actions →
-   New repository secret**. Name it `TRAINER_TOKEN` and paste the token.
-3. Push a commit. Open **Actions → Trainer** and read the summary.
+```sh
+deno task trainer:setup
+```
+
+Your browser opens BayLeaf. Approve the 30-day token. The script saves it to
+`.env` (ignored by Git) and, if the [GitHub CLI](https://cli.github.com/) is
+installed and logged in, to your repository's `TRAINER_TOKEN` secret. Push a
+commit, open **Actions → Trainer**, and read the summary.
+
+Without the GitHub CLI, add the secret by hand: **Settings → Secrets and
+variables → Actions → New repository secret**, named `TRAINER_TOKEN`, with the
+value after `TRAINER_TOKEN=` in `.env`.
 
 The token spends your own BayLeaf allowance and can do nothing except ask that
 model questions. Anyone who can push to your repository can use it, so add
 only collaborators you trust. When it expires, the run fails and tells you so:
-make a new token and replace the secret.
+run `deno task trainer:setup` again. Revoke tokens any time on the
+[BayLeaf dashboard](https://api.bayleaf.dev/dashboard).
 
-To ask your trainer at your desk before pushing:
-
-```sh
-TRAINER_TOKEN=sk-bayleaf-grant-... deno task review
-```
+To ask your trainer at your desk before pushing: `deno task review`.
 
 No BayLeaf access? Any OpenAI-compatible service works: also set
 `TRAINER_BASE_URL` and `TRAINER_MODEL`.
