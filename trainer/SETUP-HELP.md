@@ -3,7 +3,8 @@
 You can fix this in your browser:
 
 1. On the [BayLeaf dashboard](https://api.bayleaf.dev/dashboard), under **Temporary inference
-   tokens**, create a 30-day token for `openrouter:z-ai/glm-5.3-flash` and copy it.
+   tokens**, open **Create a token**. Choose `openrouter:z-ai/glm-5.3-flash`, set the lifetime to
+   `2592000` seconds (30 days; the default is only one hour), create it, and copy it.
 2. Open [this repository's new secret page](https://github.com/REPOSITORY/settings/secrets/actions/new),
    name the secret `TRAINER_TOKEN` (for an old token, edit the existing secret instead), and paste
    the token as its value.

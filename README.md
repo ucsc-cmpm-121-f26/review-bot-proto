@@ -19,8 +19,8 @@ Open the link it prints and approve a 30-day token on BayLeaf. If the
 [GitHub CLI](https://cli.github.com/) is installed and logged in, the script
 saves the token as your repository's `TRAINER_TOKEN` secret; otherwise it shows
 you how to add it by hand. On a remote machine such as a Codespace, the approval
-can't reach the script: create the token on the
-[BayLeaf dashboard](https://api.bayleaf.dev/dashboard) and add the secret by hand.
+can't reach the script: follow the browser steps in
+[`trainer/SETUP-HELP.md`](trainer/SETUP-HELP.md) instead.
 
 Push a commit, wait a couple of minutes, and read the comment on that commit. To
 answer the trainer, reply to its comment; the next review reads your reply.
