@@ -44,8 +44,8 @@ jobs:
         run: |
           npm install --global @opencode/cli
           mkdir -p ~/.config/opencode && echo '{"update":"disable"}' > ~/.config/opencode/opencode.json
-      # The agent's final answer goes to stdout and becomes the comment; its
-      # tool activity goes to stderr and stays in this log as technical detail.
+      # The marked review becomes the comment; everything else the agent says or
+      # does stays in this log as technical detail.
       - name: Review this push
         if: steps.token.outputs.ready == 'true'
         shell: bash
@@ -56,9 +56,13 @@ jobs:
           esac
           opencode run --standalone --agent trainer \
             "Review the push ending at ${GITHUB_SHA} in ${GITHUB_REPOSITORY}. Previous head: ${BEFORE:-none, review the repository as it stands}." \
-            | tee "$RUNNER_TEMP/review.md"
-          if [ ! -s "$RUNNER_TEMP/review.md" ]; then
-            echo "::error title=Trainer wrote nothing::If the log shows a 401, run deno task trainer:setup again."
+            | tee "$RUNNER_TEMP/raw.md"
+          # Stdout holds everything the agent said while working. Only the text
+          # after its last marker line is the review.
+          awk '/^[[:space:]]*<!-- trainer-review -->[[:space:]]*$/ { buf = ""; found = 1; next }
+            found { buf = buf $0 "\n" } END { printf "%s", buf }' "$RUNNER_TEMP/raw.md" > "$RUNNER_TEMP/review.md"
+          if ! grep -q '<!-- trainer-state v1 ' "$RUNNER_TEMP/review.md"; then
+            echo "::error title=Trainer wrote no usable review::Missing the review marker or state line. If the log shows a 401, run deno task trainer:setup again."
             exit 1
           fi
         env:
