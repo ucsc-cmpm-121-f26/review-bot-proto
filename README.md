@@ -25,9 +25,9 @@ can't reach the script: create the token on the
 Push a commit, wait a couple of minutes, and read the comment on that commit. To
 answer the trainer, reply to its comment; the next review reads your reply.
 
-When a token expires, the run goes red and the trainer goes quiet. Run setup
-again. A red **Trainer** run always means the trainer failed, never that your
-code did badly.
+If the token is missing or has expired, the comment on your commit says what's
+wrong and how to fix it, in your browser if you prefer. A red **Trainer** run
+means the trainer itself failed, never that your code did badly.
 
 ## How it works
 
