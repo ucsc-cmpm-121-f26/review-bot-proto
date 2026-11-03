@@ -42,4 +42,3 @@ function frame() {
 }
 
 requestAnimationFrame(frame);
-const   broken=1
