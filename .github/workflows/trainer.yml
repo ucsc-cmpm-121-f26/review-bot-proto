@@ -44,16 +44,33 @@ jobs:
         run: |
           npm install --global @opencode/cli
           mkdir -p ~/.config/opencode && echo '{"update":"disable"}' > ~/.config/opencode/opencode.json
+      # Memory never depends on the model composing the right shell command.
+      - name: Gather past reviews and rule changes
+        if: steps.token.outputs.ready == 'true'
+        run: |
+          case "$BEFORE" in
+            ""|*[!0]*) ;;
+            *) BEFORE="" ;;
+          esac
+          echo "BEFORE=$BEFORE" >> "$GITHUB_ENV"
+          mkdir -p .trainer-context
+          gh api "repos/$GITHUB_REPOSITORY/comments" --paginate \
+            --jq '.[] | {author: .user.login, association: .author_association, commit: .commit_id, created_at, body}' \
+            | jq -s 'sort_by(.created_at) | .[-30:]' > .trainer-context/past-comments.json
+          : > .trainer-context/rule-changes.diff
+          if [ -n "$BEFORE" ]; then
+            git diff "$BEFORE" "$GITHUB_SHA" -- trainer .opencode .github/workflows/trainer.yml \
+              > .trainer-context/rule-changes.diff || : > .trainer-context/rule-changes.diff
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
       # The marked review becomes the comment; everything else the agent says or
       # does stays in this log as technical detail.
       - name: Review this push
         if: steps.token.outputs.ready == 'true'
         shell: bash
         run: |
-          case "$BEFORE" in
-            ""|*[!0]*) ;;
-            *) BEFORE="" ;;
-          esac
           opencode run --standalone --agent trainer \
             "Review the push ending at ${GITHUB_SHA} in ${GITHUB_REPOSITORY}. Previous head: ${BEFORE:-none, review the repository as it stands}." \
             | tee "$RUNNER_TEMP/raw.md"
@@ -61,14 +78,32 @@ jobs:
           # after its last marker line is the review.
           awk '/^[[:space:]]*<!-- trainer-review -->[[:space:]]*$/ { buf = ""; found = 1; next }
             found { buf = buf $0 "\n" } END { printf "%s", buf }' "$RUNNER_TEMP/raw.md" > "$RUNNER_TEMP/review.md"
-          if ! grep -q '<!-- trainer-state v1 ' "$RUNNER_TEMP/review.md"; then
-            echo "::error title=Trainer wrote no usable review::Missing the review marker or state line. If the log shows a 401, run deno task trainer:setup again."
+          state() { sed -n 's/.*<!-- trainer-state v1 \(.*\) -->.*/\1/p' | tail -n 1; }
+          new_state=$(state < "$RUNNER_TEMP/review.md")
+          if ! jq -e '.findings' <<< "$new_state" > /dev/null 2>&1; then
+            echo "::error title=Trainer wrote no usable review::Missing the review marker or a valid state line. If the log shows a 401, run deno task trainer:setup again."
             exit 1
           fi
+          # Facts the workflow can establish itself go on the comment directly.
+          old_state=$(jq -r '[.[] | select(.author == "github-actions[bot]")] | last | .body // ""' .trainer-context/past-comments.json | state)
+          [ -n "$old_state" ] || old_state='{"findings":[]}'
+          lost=$(jq -rn --argjson new "$new_state" --argjson old "$old_state" \
+            '($new.findings | map(.id)) as $ids | [$old.findings[] | select(.status == "open" and (.id | IN($ids[]) | not)) | .id] | join(", ")' 2>/dev/null || true)
+          {
+            if [ -s .trainer-context/rule-changes.diff ]; then
+              echo "> **This push changed the trainer's rules:** $(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- trainer .opencode .github/workflows/trainer.yml | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
+              echo
+            fi
+            cat "$RUNNER_TEMP/review.md"
+            if [ -n "$lost" ]; then
+              echo
+              echo "> **Memory check:** this review dropped earlier open findings without a status: $lost."
+            fi
+          } > "$RUNNER_TEMP/comment.md"
+          mv "$RUNNER_TEMP/comment.md" "$RUNNER_TEMP/review.md"
         env:
           TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
       - uses: actions/upload-artifact@v4
         if: steps.token.outputs.ready == 'true'
