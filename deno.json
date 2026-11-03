@@ -13,7 +13,7 @@
     "lint": "deno lint",
     "fmt": "deno fmt",
     "ci": "deno fmt --check && deno lint && deno task check && deno task build",
-    "trainer:setup": "deno run --allow-net --allow-read=.env --allow-write=.env --allow-env --allow-run=git,gh,open,xdg-open,rundll32 trainer/setup.ts",
+    "trainer:setup": "deno run --allow-net --allow-read=.env --allow-write=.env --allow-env --allow-run trainer/setup.ts",
     "review": "deno run --allow-env --allow-read --allow-write --allow-net --allow-run=git trainer/review.ts"
   },
   "exclude": ["node_modules", "dist", ".git"]
