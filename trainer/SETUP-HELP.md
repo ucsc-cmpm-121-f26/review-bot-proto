@@ -1,6 +1,7 @@
 **Your trainer can't review this push yet: REASON**
 
-This comment comes back on every push until you do one of two things.
+This comment and the red X on the **Trainer** workflow come back on every push until you do one of
+two things.
 
 ### Finish setting up
 

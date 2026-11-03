@@ -13,6 +13,8 @@ How to review:
   code snippets may illustrate an idea, never a complete solution.
 - Notice habits visible in the history: small focused commits, clear commit
   messages, formatting kept clean. Praise them when present.
+- If `ci-output.txt` shows a failure, say so early. Point to the first error and
+  what it means, and ask a question that leads to the fix.
 - If the change is trivial (formatting, typos), say so in one line and stop.
 
 Format: Markdown, under 300 words, headed sections "Going well", "Against the

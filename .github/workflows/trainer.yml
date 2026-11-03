@@ -8,8 +8,8 @@
 #                and .opencode/ folders and opencode.jsonc. Your game doesn't use
 #                them.
 #
-# Until you opt out or finish setting up (see README.md), the trainer comments on
-# every push to remind you.
+# Until you opt out or finish setting up (see README.md), every push gets a reminder
+# comment and a red X on this workflow. Your game isn't affected.
 # ==============================================================================
 name: Trainer
 
@@ -30,8 +30,12 @@ jobs:
   review:
     if: true # OPT OUT: change true to false to turn the trainer off.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
+      actions: read
+    outputs:
+      ready: ${{ steps.model.outputs.ready }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,9 +68,24 @@ jobs:
             *) reason="BayLeaf didn't answer as expected (status $status). If the steps below don't help, try again later." ;;
           esac
           sed -e "s|REASON|$reason|" -e "s|REPOSITORY|$GITHUB_REPOSITORY|" trainer/SETUP-HELP.md > review.md
-          echo "::warning title=Trainer not ready::$reason"
         env:
           TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
+      # A push starts every workflow at once, so wait for the others and keep the
+      # logs of any that fail for the trainer to read. Empty means they all passed.
+      - name: Wait for this commit's other workflows
+        if: steps.model.outputs.ready == 'true'
+        run: |
+          sleep 15
+          : > ci-output.txt
+          others=$(gh run list --commit "$GITHUB_SHA" --json databaseId,workflowName \
+            --jq '.[] | select(.workflowName != "Trainer") | .databaseId')
+          for run in $others; do
+            gh run watch "$run" --exit-status > /dev/null && continue
+            gh run view "$run" --log-failed >> ci-output.txt || true
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
       - if: steps.model.outputs.ready == 'true'
         run: npm install --global @opencode/cli
       - name: Review this push
@@ -90,8 +109,8 @@ jobs:
           retention-days: 1
 
   # This key can push code, so it lives on a separate machine, with no model and
-  # none of the repository's code. Green means a comment was delivered, whatever
-  # it says. Red means the trainer itself failed.
+  # none of the repository's code. Green means a review was delivered, whatever it
+  # says. Red means there is no review: the comment on the commit or this log says why.
   post:
     needs: review
     runs-on: ubuntu-latest
@@ -105,3 +124,8 @@ jobs:
         run: gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@review.md
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Stay red until set up or opted out
+        if: needs.review.outputs.ready != 'true'
+        run: |
+          echo "::error title=Trainer not set up::Finish setup or opt out. The comment on this commit explains both."
+          exit 1

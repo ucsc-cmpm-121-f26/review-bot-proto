@@ -8,3 +8,4 @@ dist/
 Thumbs.db
 past-comments.jsonl
 review.md
+ci-output.txt

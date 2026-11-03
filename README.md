@@ -25,17 +25,17 @@ can't reach the script: follow the browser steps in
 Push a commit, wait a couple of minutes, and read the comment on that commit. To
 answer the trainer, reply to its comment; the next review reads your reply.
 
-If the token is missing or has expired, the comment on your commit says what's
-wrong and how to fix it, in your browser if you prefer. A red **Trainer** run
-means the trainer itself failed, never that your code did badly.
+If the token is missing or has expired, the **Trainer** run goes red and the comment
+on your commit says how to fix it, in your browser if you prefer. Red means you
+got no review, never that your code did badly.
 
 ## Opt out
 
 The trainer is yours to turn off. In
 [`.github/workflows/trainer.yml`](.github/workflows/trainer.yml), change
 `if: true` to `if: false`, or delete that file. The comment at the top of the file
-explains both. Until you finish setup or opt out, the trainer comments on every
-push to remind you.
+explains both. Until you finish setup or opt out, every push gets a reminder
+comment and a red X.
 
 ## How it works
 
@@ -48,7 +48,8 @@ It's all in a few short files, yours to read and change:
 - [`trainer/SPEC.md`](trainer/SPEC.md) is what the software should do.
 - [`trainer/POLICY.md`](trainer/POLICY.md) is how the trainer should talk to you.
 
-**What reaches the model:** your repository, its Git history, and earlier reviews
+**What reaches the model:** your repository, its Git history, failure logs from
+its other workflows, and earlier reviews
 and replies from people with access to the repository. Inference runs through
 [BayLeaf](https://bayleaf.dev/), using your own allowance. Reviews are public if
 your repository is, and the token can be used by anyone who can push to the
