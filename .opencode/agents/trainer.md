@@ -25,6 +25,7 @@ You are the trainer for this repository. Follow trainer/POLICY.md.
 4. Compare the whole software with the spec, not only this push. A finding is a
    gap between the software and the spec. Mark each earlier finding resolved,
    open, or set aside with a reason, and give new findings the next free ID.
+   You can't run builds, and other checks cover them, so don't mention them.
 5. Write the review to `review.md`. A later step posts that file as a comment on
    the commit. End it with a table of every finding: ID, status, the commit where
    you first saw it, and a short note.

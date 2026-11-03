@@ -41,6 +41,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
       - name: Check a review was written
+        if: ${{ !cancelled() }}
         run: |
           if [ ! -s review.md ]; then
             echo "::error title=No review::Check the log above. If your token is missing or expired, run deno task trainer:setup."
