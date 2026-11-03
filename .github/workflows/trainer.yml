@@ -5,6 +5,10 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# The key is the fence. contents: read lets the trainer read code and comments
+# and *create* commit comments, but not push, edit, or delete anything, so its
+# record of past reviews is append-only. Nothing here depends on the game's own
+# build passing.
 permissions:
   contents: read
 
@@ -19,12 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 50
-      - uses: denoland/setup-deno@v2.0.5
-        with:
-          deno-version: v2.9.7
-      - name: Review this push
-        run: deno task review
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the trainer is set up
+        id: token
+        run: |
+          if [ -z "$TRAINER_TOKEN" ]; then
+            echo "::warning title=Trainer not set up::Run deno task trainer:setup (see README.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
         env:
           TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
-          TRAINER_BEFORE: ${{ github.event.before }}
+      - name: Install OpenCode
+        if: steps.token.outputs.ready == 'true'
+        run: |
+          npm install --global @opencode/cli
+          mkdir -p ~/.config/opencode && echo '{"update":"disable"}' > ~/.config/opencode/opencode.json
+      - name: Review this push
+        if: steps.token.outputs.ready == 'true'
+        run: >
+          opencode run --standalone --agent trainer
+          "Review push ${BEFORE}..${GITHUB_SHA} in ${GITHUB_REPOSITORY}."
+        env:
+          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          OPENCODE_DISABLE_FREE_MODELS: "1"
