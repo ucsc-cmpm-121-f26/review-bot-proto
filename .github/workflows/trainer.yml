@@ -1,3 +1,16 @@
+# ==============================================================================
+# WANT TO OPT OUT OF THE TRAINER? It's your choice. Do either one:
+#
+#   Turn it off: below, under "jobs:" and "review:", change "if: true" to
+#                "if: false". Change it back whenever you like.
+#
+#   Remove it:   delete this file. To remove all of it, also delete the trainer/
+#                and .opencode/ folders and opencode.jsonc. Your game doesn't use
+#                them.
+#
+# Until you opt out or finish setting up (see README.md), the trainer comments on
+# every push to remind you.
+# ==============================================================================
 name: Trainer
 
 on:
@@ -15,6 +28,7 @@ concurrency:
 jobs:
   # The model runs here, on a machine with no key that can change the repository.
   review:
+    if: true # OPT OUT: change true to false to turn the trainer off.
     runs-on: ubuntu-latest
     permissions:
       contents: read

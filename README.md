@@ -29,6 +29,14 @@ If the token is missing or has expired, the comment on your commit says what's
 wrong and how to fix it, in your browser if you prefer. A red **Trainer** run
 means the trainer itself failed, never that your code did badly.
 
+## Opt out
+
+The trainer is yours to turn off. In
+[`.github/workflows/trainer.yml`](.github/workflows/trainer.yml), change
+`if: true` to `if: false`, or delete that file. The comment at the top of the file
+explains both. Until you finish setup or opt out, the trainer comments on every
+push to remind you.
+
 ## How it works
 
 It's all in a few short files, yours to read and change:

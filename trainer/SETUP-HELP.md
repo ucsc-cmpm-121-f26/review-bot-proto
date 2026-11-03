@@ -1,6 +1,8 @@
 **Your trainer can't review this push yet: REASON**
 
-You can fix this in your browser:
+This comment comes back on every push until you do one of two things.
+
+### Finish setting up
 
 1. On the [BayLeaf dashboard](https://api.bayleaf.dev/dashboard), under **Temporary inference
    tokens**, open **Create a token**. Choose `openrouter:z-ai/glm-5.3-flash`, set the lifetime to
@@ -13,5 +15,10 @@ You can fix this in your browser:
 Or, from a clone of this repository with the [GitHub CLI](https://cli.github.com/) logged in, run
 `deno task trainer:setup`.
 
-Your game and its other checks aren't affected. If you don't want a trainer, delete
-`.github/workflows/trainer.yml` and this message will stop.
+### Or opt out
+
+[Edit the workflow](https://github.com/REPOSITORY/edit/main/.github/workflows/trainer.yml), change
+`if: true` to `if: false`, and commit. To remove the trainer completely, follow the instructions at
+the top of that file.
+
+Your game and its other checks aren't affected either way.
