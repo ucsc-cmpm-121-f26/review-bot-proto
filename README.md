@@ -1,11 +1,8 @@
 # Firefly Catch (trainer prototype)
 
-A tiny web game with a **trainer**: an AI reviewer that runs on every push to
-`main` and compares your code with [`trainer/SPEC.md`](trainer/SPEC.md). Its
-review arrives as a public comment on your commit, and it remembers earlier
-reviews and your replies to them. A green Trainer run means a review was
-delivered, not that your code is good; a red one means the trainer itself
-failed. The trainer's feedback is practice, separate from anything course staff
+A tiny web game with a **trainer**: an AI that reviews every push to `main`
+against [`trainer/SPEC.md`](trainer/SPEC.md) and posts a public comment on your
+commit. The trainer's feedback is practice, separate from anything course staff
 evaluate.
 
 Install [Deno](https://docs.deno.com/runtime/getting_started/installation/)
@@ -18,35 +15,37 @@ template, clone it, and run `deno task dev`.
 deno task trainer:setup
 ```
 
-Your browser opens BayLeaf. Approve the 30-day token. The script saves it to
-`.env` (ignored by Git) and, if the [GitHub CLI](https://cli.github.com/) is
-installed and logged in, to your repository's `TRAINER_TOKEN` secret. Push a
-commit, wait a minute or two, and read the comment on that commit on GitHub. To
+Open the link it prints and approve a 30-day token on BayLeaf. If the
+[GitHub CLI](https://cli.github.com/) is installed and logged in, the script
+saves the token as your repository's `TRAINER_TOKEN` secret; otherwise it shows
+you how to add it by hand. On a remote machine such as a Codespace, the approval
+can't reach the script: create the token on the
+[BayLeaf dashboard](https://api.bayleaf.dev/dashboard) and add the secret by hand.
+
+Push a commit, wait a couple of minutes, and read the comment on that commit. To
 answer the trainer, reply to its comment; the next review reads your reply.
 
-Without the GitHub CLI, add the secret by hand: **Settings → Secrets and
-variables → Actions → New repository secret**, named `TRAINER_TOKEN`, with the
-value after `TRAINER_TOKEN=` in `.env`.
+When a token expires, the run goes red and the trainer goes quiet. Run setup
+again. A red **Trainer** run always means the trainer failed, never that your
+code did badly.
 
-The token spends your own BayLeaf allowance and can do nothing except ask that
-model questions. Anyone who can push to your repository can use it, so add
-only collaborators you trust. When it expires, the run fails and tells you so:
-run `deno task trainer:setup` again. Revoke tokens any time on the
-[BayLeaf dashboard](https://api.bayleaf.dev/dashboard).
+## How it works
 
-To ask your trainer at your desk before pushing: `deno task review`.
+It's all in a few short files, yours to read and change:
 
-No BayLeaf access? Any OpenAI-compatible service works: also set
-`TRAINER_BASE_URL` and `TRAINER_MODEL`.
+- [`.github/workflows/trainer.yml`](.github/workflows/trainer.yml) runs on each
+  push: one job runs the model, a separate job posts its review.
+- [`.opencode/agents/trainer.md`](.opencode/agents/trainer.md) is the agent's
+  instructions and what it may do. [`opencode.jsonc`](opencode.jsonc) names the model.
+- [`trainer/SPEC.md`](trainer/SPEC.md) is what the software should do.
+- [`trainer/POLICY.md`](trainer/POLICY.md) is how the trainer should talk to you.
 
-## What gets sent
+**What reaches the model:** your repository, its Git history, and earlier reviews
+and replies from people with access to the repository. Inference runs through
+[BayLeaf](https://bayleaf.dev/), using your own allowance. Reviews are public if
+your repository is, and the token can be used by anyone who can push to the
+repository.
 
-On GitHub, the agent in [`.opencode/agents/trainer.md`](.opencode/agents/trainer.md)
-decides what to read: anything in your repository, its Git history, and comments
-on its commits can reach the model. Its GitHub key is read-only: a separate job,
-with no model in it, posts the agent's final message as the comment. At your desk,
-[`trainer/review.ts`](trainer/review.ts) sends a fixed bundle instead: the spec,
-your last 20 commit subjects, the diff being reviewed, and the files in `src/`.
-[`trainer/SPEC.md`](trainer/SPEC.md), [`trainer/POLICY.md`](trainer/POLICY.md),
-and the agent file are yours: edit them to change what the trainer looks for and
-how it talks to you.
+**What the model can do:** read those things and write `review.md`. It never holds
+a key that can change your repository, but it can still be wrong, so weigh what it
+says.

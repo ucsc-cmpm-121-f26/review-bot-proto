@@ -5,10 +5,6 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# Each job below asks for its own key. GitHub has no key that can post a commit
-# comment without also being able to push, so the agent and that key never meet:
-# review runs the agent read-only, and post only publishes what review printed.
-# Nothing here depends on the game's own build passing.
 permissions: {}
 
 # A newer push makes an older review moot.
@@ -17,116 +13,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The model runs here, on a machine with no key that can change the repository.
   review:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      ready: ${{ steps.token.outputs.ready }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check the trainer is set up
-        id: token
-        run: |
-          if [ -z "$TRAINER_TOKEN" ]; then
-            echo "::warning title=Trainer not set up::Run deno task trainer:setup (see README.md)."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
-      - name: Install OpenCode
-        if: steps.token.outputs.ready == 'true'
-        run: |
-          npm install --global @opencode/cli
-          mkdir -p ~/.config/opencode && echo '{"update":"disable"}' > ~/.config/opencode/opencode.json
-      # Memory never depends on the model composing the right shell command.
-      - name: Gather past reviews and rule changes
-        if: steps.token.outputs.ready == 'true'
-        run: |
-          case "$BEFORE" in
-            ""|*[!0]*) ;;
-            *) BEFORE="" ;;
-          esac
-          echo "BEFORE=$BEFORE" >> "$GITHUB_ENV"
-          mkdir -p .trainer-context
-          gh api "repos/$GITHUB_REPOSITORY/comments" --paginate \
-            --jq '.[] | {author: .user.login, association: .author_association, commit: .commit_id, created_at, body}' \
-            | jq -s 'sort_by(.created_at) | .[-30:]' > .trainer-context/past-comments.json
-          : > .trainer-context/rule-changes.diff
-          if [ -n "$BEFORE" ]; then
-            git diff "$BEFORE" "$GITHUB_SHA" -- trainer .opencode .github/workflows/trainer.yml \
-              > .trainer-context/rule-changes.diff || : > .trainer-context/rule-changes.diff
-          fi
+      # Anyone can comment on a public commit, so only the trainer's own comments
+      # and those of people with access to this repository reach the model.
+      - name: Collect past reviews and replies
+        run: >
+          gh api "repos/$GITHUB_REPOSITORY/comments" --paginate
+          --jq '.[] | select(.user.login == "github-actions[bot]" or (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR")))
+          | {author: .user.login, commit: .commit_id, created_at, body}'
+          > past-comments.jsonl
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
-      # The marked review becomes the comment; everything else the agent says or
-      # does stays in this log as technical detail.
+      - run: npm install --global @opencode/cli
       - name: Review this push
-        if: steps.token.outputs.ready == 'true'
-        shell: bash
+        run: opencode run --standalone --agent trainer "Review the push from $BEFORE to $GITHUB_SHA."
+        env:
+          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
+          BEFORE: ${{ github.event.before }}
+          OPENCODE_DISABLE_FREE_MODELS: "1"
+      - name: Check a review was written
         run: |
-          opencode run --standalone --agent trainer \
-            "Review the push ending at ${GITHUB_SHA} in ${GITHUB_REPOSITORY}. Previous head: ${BEFORE:-none, review the repository as it stands}." \
-            | tee "$RUNNER_TEMP/raw.md"
-          # Stdout holds everything the agent said while working. Only the text
-          # after its last marker line is the review.
-          awk '/^[[:space:]]*<!-- trainer-review -->[[:space:]]*$/ { buf = ""; found = 1; next }
-            found { buf = buf $0 "\n" } END { printf "%s", buf }' "$RUNNER_TEMP/raw.md" > "$RUNNER_TEMP/review.md"
-          state() { sed -n 's/.*<!-- trainer-state v1 \(.*\) -->.*/\1/p' | tail -n 1; }
-          new_state=$(state < "$RUNNER_TEMP/review.md")
-          if ! jq -e '.findings' <<< "$new_state" > /dev/null 2>&1; then
-            echo "::error title=Trainer wrote no usable review::Missing the review marker or a valid state line. If the log shows a 401, run deno task trainer:setup again."
+          if [ ! -s review.md ]; then
+            echo "::error title=No review::Check the log above. If your token is missing or expired, run deno task trainer:setup."
             exit 1
           fi
-          # Facts the workflow can establish itself go on the comment directly.
-          old_state=$(jq -r '[.[] | select(.author == "github-actions[bot]")] | last | .body // ""' .trainer-context/past-comments.json | state)
-          [ -n "$old_state" ] || old_state='{"findings":[]}'
-          lost=$(jq -rn --argjson new "$new_state" --argjson old "$old_state" \
-            '($new.findings | map(.id)) as $ids | [$old.findings[] | select(.status == "open" and (.id | IN($ids[]) | not)) | .id] | join(", ")' 2>/dev/null || true)
-          {
-            if [ -s .trainer-context/rule-changes.diff ]; then
-              echo "> **This push changed the trainer's rules:** $(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- trainer .opencode .github/workflows/trainer.yml | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
-              echo
-            fi
-            cat "$RUNNER_TEMP/review.md"
-            if [ -n "$lost" ]; then
-              echo
-              echo "> **Memory check:** this review dropped earlier open findings without a status: $lost."
-            fi
-          } > "$RUNNER_TEMP/comment.md"
-          mv "$RUNNER_TEMP/comment.md" "$RUNNER_TEMP/review.md"
-        env:
-          TRAINER_TOKEN: ${{ secrets.TRAINER_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
-          OPENCODE_DISABLE_FREE_MODELS: "1"
       - uses: actions/upload-artifact@v4
-        if: steps.token.outputs.ready == 'true'
         with:
-          name: trainer-review
-          path: ${{ runner.temp }}/review.md
+          name: review
+          path: review.md
           retention-days: 1
 
-  # Green means a review was delivered, whatever it says. Red means only that the
-  # trainer itself failed. The comment is the main outcome; the run keeps the detail.
+  # This key can push code, so it lives on a separate machine, with no model and
+  # none of the repository's code. Green means a review was delivered, whatever
+  # it says. Red means the trainer itself failed.
   post:
     needs: review
-    if: needs.review.outputs.ready == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: trainer-review
+          name: review
       - name: Comment on the commit
-        run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@review.md --jq .html_url)
-          echo "**[Read the trainer's review on this commit]($url)**" >> "$GITHUB_STEP_SUMMARY"
+        run: gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@review.md
         env:
           GH_TOKEN: ${{ github.token }}

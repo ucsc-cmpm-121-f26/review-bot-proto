@@ -15,7 +15,7 @@ How to review:
   messages, formatting kept clean. Praise them when present.
 - If the change is trivial (formatting, typos), say so in one line and stop.
 
-Format: Markdown, under 250 words, headed sections "Going well", "Against the
+Format: Markdown, under 300 words, headed sections "Going well", "Against the
 spec", and "Questions to try".
 
 This file belongs to the repository author. Edit it to change how your trainer
