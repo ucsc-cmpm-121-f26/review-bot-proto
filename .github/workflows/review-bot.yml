@@ -96,10 +96,18 @@ jobs:
         run: npm install --global @opencode/cli@2.2.5
       - name: Review this push
         if: steps.model.outputs.ready
+        shell: bash
         run: |
-          opencode run --standalone --auto --model bayleaf/glm "$INSTRUCTIONS
+          opencode run --standalone --auto --model bayleaf/glm --format json "$INSTRUCTIONS
 
-          Review the push from $BEFORE to $GITHUB_SHA."
+          Review the push from $BEFORE to $GITHUB_SHA." | tee "$RUNNER_TEMP/events.jsonl"
+          # The footer is measured here, not written by the model.
+          if [ -s review/review.md ]; then
+            jq -rs --arg harness "OpenCode $(opencode --version)" \
+              '[.[] | select(.type == "step_finish").part] |
+              "\n\n---\n<sub>\($harness) · openrouter:z-ai/glm-5.3-flash · \(length) steps · $\(map(.cost) | add | . * 10000 | round / 10000) API spend</sub>"' \
+              "$RUNNER_TEMP/events.jsonl" >> review/review.md
+          fi
         env:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
