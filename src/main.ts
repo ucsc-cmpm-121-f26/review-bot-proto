@@ -1,5 +1,5 @@
 // Firefly Catch: the deliberately small game the review bot prototype reviews.
-// It meets SPEC.md items 1–3 and leaves 4 and 5 for the player of the repo.
+// It meets items 1–3 of the list in REVIEWBOT.md and leaves 4 and 5 for the owner of the repo.
 
 const canvas = document.createElement("canvas");
 canvas.width = 480;
