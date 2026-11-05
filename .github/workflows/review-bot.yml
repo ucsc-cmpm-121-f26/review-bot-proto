@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   # The model may do anything on this throwaway machine, which has no key that can
-  # change the repository. Only the text of review.md leaves it.
+  # change the repository. Only the review/ folder leaves it.
   review:
     if: true # OPT OUT: change true to false to turn the review bot off.
     runs-on: ubuntu-latest
@@ -37,6 +37,7 @@ jobs:
       actions: read
     outputs:
       ready: ${{ steps.model.outputs.ready }}
+      files: ${{ steps.upload.outputs.artifact-url }}
     env:
       GH_REPO: ${{ github.repository }}
     steps:
@@ -57,7 +58,8 @@ jobs:
             *) reason="BayLeaf answered with status $status." ;;
           esac
           repo="https://github.com/$GITHUB_REPOSITORY"
-          cat > review.md <<EOF
+          mkdir -p review
+          cat > review/review.md <<EOF
           **Your review bot can't review this push yet: $reason**
 
           This comment and a red X come back on every push until you do one of two things:
@@ -114,8 +116,11 @@ jobs:
               }
             }
           INSTRUCTIONS: |
-            You review this repository. Write your review to review.md, and a later step
-            posts it as a comment on the commit. Never mention grades, points, or deadlines.
+            You review this repository. Write your review to review/review.md, and a later
+            step posts it as a comment on the commit. Never mention grades, points, or deadlines.
+            Save anything else worth keeping in review/, such as screenshots, test scripts, and
+            logs: the comment links to it as a zip. It's public if this repository is, so never
+            save tokens or environment variables there, and leave out dependencies.
 
             REVIEWBOT.md, if it exists, says what this repository wants and overrides this.
             past-comments.jsonl has your earlier reviews (by github-actions[bot]) and the
@@ -131,14 +136,15 @@ jobs:
             Say so first if this push changed REVIEWBOT.md, AGENTS.md, or this workflow.
             End with a table of every finding: ID, status, first seen commit, note.
       - uses: actions/upload-artifact@v4
+        id: upload
         with:
           name: review
-          path: review.md
+          path: review/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   # This key can push code, so it stays on a separate machine with no model and none
-  # of the repository's code. Green means you got a review, whatever it says. Red means
+  # of the repository's code, and it only posts review.md. Green means you got a review, whatever it says. Red means
   # you didn't, never that your code did badly; the comment or the log says why.
   post:
     needs: review
@@ -151,6 +157,9 @@ jobs:
           name: review
       - name: Comment on the commit
         run: |
+          if [ "$(find . -type f | wc -l)" -gt 1 ]; then
+            printf '\n\n[Download the files from this review](%s) (30 days; needs a GitHub login).\n' "$FILES" >> review.md
+          fi
           gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@review.md
           if [ "$READY" != "true" ]; then
             echo "::error title=Review bot not set up::The comment on this commit explains what to do."
@@ -159,3 +168,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           READY: ${{ needs.review.outputs.ready }}
+          FILES: ${{ needs.review.outputs.files }}

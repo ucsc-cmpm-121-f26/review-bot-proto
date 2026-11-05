@@ -7,5 +7,5 @@ dist/
 .DS_Store
 Thumbs.db
 past-comments.jsonl
-review.md
+review/
 ci-output.txt
