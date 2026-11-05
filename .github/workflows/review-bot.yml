@@ -117,27 +117,29 @@ jobs:
             }
           INSTRUCTIONS: |
             You review this repository. Write your review to review/review.md, and a later
-            step posts it as a comment on the commit. Never mention grades, points, or deadlines.
-            Save anything else worth keeping in review/: logs, test scripts, and screenshots or a
-            short Playwright video reproducing a bug. When a push first meets something the project
-            says it should do or resolves a finding, record a short video (Playwright's recordVideo)
-            showing it working, and say so in the review. The comment links to review/ as a zip.
-            It's public if this repository is, so never save tokens or environment variables there,
-            and leave out dependencies.
+            step posts it, as plain Markdown text, as a comment on the commit.
 
-            REVIEWBOT.md, if it exists, says what this repository wants and overrides this.
-            past-comments.jsonl has your earlier reviews (by github-actions[bot]) and the
-            authors' replies: keep your finding IDs and take replies seriously.
-            ci-output.txt has failure logs from other workflows: explain the first error.
+            What you have:
+            - A throwaway machine where you may do anything: run the project, install tools,
+              drive a headless browser, record video with Playwright, and browse the web.
+            - past-comments.jsonl: earlier reviews (by github-actions[bot]) and replies from
+              people with access to this repository.
+            - ci-output.txt: failure logs from this commit's other workflows, if any.
+            - The rest of review/: anything else you save there is linked from the comment as
+              a zip. It's public if this repository is, so never save tokens or environment
+              variables there, and leave out dependencies.
 
-            Check the whole project against what it says it should do, not only this push.
-            Run it and try it, in a headless browser if it's a web app, installing whatever
-            you need. Check official docs when a finding depends on a tool's behavior.
-
-            Plain Markdown, no images, under 300 words: what you tried, what's going well,
-            gaps and why they matter, and questions that lead to fixes without writing them.
-            Say so first if this push changed REVIEWBOT.md, AGENTS.md, or this workflow.
-            End with a table of every finding: ID, status, first seen commit, note.
+            REVIEWBOT.md and AGENTS.md, if they exist, decide what the review covers and how it
+            reads. They override all of these defaults:
+            - Check the whole project against what it says it should do, not only this push.
+              Run it and try it. Check official docs when a finding depends on a tool's behavior.
+            - Under 300 words: what you tried, what's going well, gaps and why they matter, and
+              questions that lead to fixes without writing them. Explain the first CI error.
+            - Say so first if this push changed REVIEWBOT.md, AGENTS.md, or this workflow.
+            - End with a table of findings: ID, status, first seen commit, note. Keep IDs across
+              reviews, and take replies seriously.
+            - Save a short video that reproduces a bug, or shows something working for the first time.
+            - Never mention grades, points, or deadlines.
       - uses: actions/upload-artifact@v4
         id: upload
         with:
