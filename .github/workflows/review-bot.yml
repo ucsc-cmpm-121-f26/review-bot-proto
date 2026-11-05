@@ -14,7 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The model runs here, on a machine with no key that can change the repository.
+  # The model runs here and may do anything: run the game, install tools, browse the
+  # web. This machine has no key that can change the repository, and only the text of
+  # review.md leaves it.
   review:
     if: true # OPT OUT: change true to false to turn the review bot off.
     runs-on: ubuntu-latest
@@ -84,6 +86,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+      - uses: denoland/setup-deno@v2.0.5
+        if: steps.model.outputs.ready == 'true'
+        with:
+          deno-version: v2.9.7
       - if: steps.model.outputs.ready == 'true'
         run: npm install --global @opencode/cli
       - name: Review this push
@@ -95,7 +101,8 @@ jobs:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
-          # The model to use and what the agent may do. Everything not allowed is denied.
+          # The model to use and what the agent may do: anything on this throwaway machine,
+          # except asking questions, which would hang with nobody here to answer.
           OPENCODE_CONFIG_CONTENT: |
             {
               "providers": {
@@ -116,16 +123,10 @@ jobs:
                 "review-bot": {
                   "mode": "primary",
                   "model": "bayleaf/glm",
-                  "steps": 30,
+                  "steps": 80,
                   "permissions": [
-                    { "action": "*", "resource": "*", "effect": "deny" },
-                    { "action": "read", "resource": "*", "effect": "allow" },
-                    { "action": "glob", "resource": "*", "effect": "allow" },
-                    { "action": "grep", "resource": "*", "effect": "allow" },
-                    { "action": "shell", "resource": "git log *", "effect": "allow" },
-                    { "action": "shell", "resource": "git diff *", "effect": "allow" },
-                    { "action": "shell", "resource": "git show *", "effect": "allow" },
-                    { "action": "edit", "resource": "review.md", "effect": "allow" }
+                    { "action": "*", "resource": "*", "effect": "allow" },
+                    { "action": "question", "resource": "*", "effect": "deny" }
                   ]
                 }
               }
@@ -144,7 +145,7 @@ jobs:
           retention-days: 1
 
   # This key can push code, so it lives on a separate machine, with no model and
-  # none of the repository's code. Green means a review was delivered, whatever it
+  # none of the repository's code: it only posts the text of review.md. Green means a review was delivered, whatever it
   # says. Red means there is no review: the comment on the commit or this log says why.
   post:
     needs: review
