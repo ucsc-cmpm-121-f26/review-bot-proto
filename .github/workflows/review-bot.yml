@@ -1,4 +1,24 @@
-# Instructions, setup, and how to opt out are in REVIEWBOT.md.
+# ==============================================================================
+# REVIEW BOT: an AI model reviews each push and comments on the commit.
+#
+# Until you do one of these, every push gets a reminder comment and a red X:
+#
+# SET UP:
+#   1. On https://api.bayleaf.dev/dashboard, under "Temporary inference tokens",
+#      open "Create a token". Choose openrouter:z-ai/glm-5.3-flash, set the lifetime
+#      to 2592000 seconds (30 days; the default is only one hour), and copy the token.
+#   2. In this repository on GitHub, go to Settings > Secrets and variables > Actions
+#      > New repository secret. Name it REVIEW_BOT_TOKEN and paste the token. Or run:
+#      gh secret set REVIEW_BOT_TOKEN
+#   3. Push any commit. Repeat these steps when the token expires.
+#
+# OPT OUT: it's your choice. Your project doesn't use any of this. Either:
+#   - Turn it off: below, under "jobs:" and "review:", change "if: true" to "if: false".
+#   - Remove it: delete this file, and REVIEWBOT.md if you like.
+#
+# REVIEWBOT.md (optional, may be empty) tells the bot what to look for in this
+# repository. The bot also follows AGENTS.md, like any agent working here.
+# ==============================================================================
 name: Review Bot
 
 on:
@@ -61,12 +81,17 @@ jobs:
           cat > review.md <<EOF
           **Your review bot can't review this push yet: $reason**
 
-          This comment and the red X on the **Review Bot** workflow come back on every push until you do one of two things:
+          This comment and the red X on the **Review Bot** workflow come back on every push until you do one of two things.
 
-          - **Set up:** create a token on the [BayLeaf dashboard](https://api.bayleaf.dev/dashboard), then save it as a [secret named REVIEW_BOT_TOKEN]($repo/settings/secrets/actions/new). [REVIEWBOT.md]($repo/blob/main/REVIEWBOT.md#set-up) has the exact steps.
-          - **Opt out:** [edit the workflow]($repo/edit/main/.github/workflows/review-bot.yml) and change "if: true" to "if: false".
+          **Set up:**
 
-          Your game and its other checks aren't affected.
+          1. On the [BayLeaf dashboard](https://api.bayleaf.dev/dashboard), under **Temporary inference tokens**, open **Create a token**. Choose **openrouter:z-ai/glm-5.3-flash**, set the lifetime to **2592000** seconds (30 days; the default is only one hour), create it, and copy it.
+          2. Open [this repository's new secret page]($repo/settings/secrets/actions/new), name the secret **REVIEW_BOT_TOKEN** (for an old token, edit the existing secret instead), and paste the token as its value.
+          3. Push any commit.
+
+          **Or opt out:** [edit the workflow]($repo/edit/main/.github/workflows/review-bot.yml) and change "if: true" to "if: false", or delete that file.
+
+          Your project and its other checks aren't affected.
           EOF
         env:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
@@ -94,13 +119,47 @@ jobs:
         run: npm install --global @opencode/cli
       - name: Review this push
         if: steps.model.outputs.ready == 'true'
-        run: >
-          opencode run --standalone --agent review-bot
-          "Read REVIEWBOT.md and follow its instructions for the bot. Review the push from $BEFORE to $GITHUB_SHA."
+        run: |
+          opencode run --standalone --agent review-bot "$INSTRUCTIONS
+
+          Review the push from $BEFORE to $GITHUB_SHA."
         env:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
+          # Instructions for any repository. REVIEWBOT.md and AGENTS.md add to them.
+          INSTRUCTIONS: |
+            You are the review bot for this repository. A later step posts review.md as a
+            comment on the pushed commit. You have no authority over anyone's grade or
+            standing in any course, so never mention grades, points, or deadlines.
+
+            1. Read REVIEWBOT.md if it exists: it may be empty or missing. It says what this
+               repository wants from you, and it overrides the defaults below.
+            2. Read past-comments.jsonl: your earlier reviews (by github-actions[bot]) and the
+               authors' replies. Keep your finding IDs, and take replies seriously.
+            3. Inspect the push with Git. If it changed REVIEWBOT.md, AGENTS.md, or this
+               workflow, open your review by saying what changed.
+            4. Read ci-output.txt, the failure logs from this commit's other workflows. If it
+               isn't empty, say so early, point to the first error and what it means, and ask
+               a question that leads to the fix.
+            5. Check the whole project against what it says it should do, not only this push.
+               You're on a throwaway machine and may do anything there that helps. Run the
+               software and try it, using a headless browser if it's a web app, instead of only
+               reading the code. Check official docs when a finding depends on how a tool or
+               API behaves, and link them. Mark each earlier finding resolved, open, or set
+               aside with a reason, and give new findings the next free ID.
+            6. Write the review to review.md, as plain Markdown text with no images or
+               attachments, under 300 words:
+               - What I tried: what you actually ran and saw, in a line or two.
+               - Going well: what the change does well, including visible habits such as small
+                 commits and clear messages.
+               - Gaps: each one, where it is, and why it matters to a user. Prefer one or two
+                 important observations over a long list.
+               - Questions to try: questions that lead the author to a fix. Don't write the fix;
+                 short snippets may illustrate an idea, never a complete solution.
+               - End with a table of every finding: ID, status, the commit where you first saw
+                 it, and a note.
+               If the change is trivial, say so in a line, and still end with the table.
           # The model to use and what the agent may do: anything on this throwaway machine.
           OPENCODE_CONFIG_CONTENT: |
             {
