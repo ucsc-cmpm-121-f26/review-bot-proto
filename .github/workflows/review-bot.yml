@@ -1,16 +1,4 @@
-# ==============================================================================
-# WANT TO OPT OUT OF THE REVIEW BOT? It's your choice. Do either one:
-#
-#   Turn it off: below, under "jobs:" and "review:", change "if: true" to
-#                "if: false". Change it back whenever you like.
-#
-#   Remove it:   delete this file. To remove all of it, also delete the review-bot/
-#                and .opencode/ folders and opencode.jsonc. Your game doesn't use
-#                them.
-#
-# Until you opt out or finish setting up (see README.md), every push gets a reminder
-# comment and a red X on this workflow. Your game isn't affected.
-# ==============================================================================
+# Instructions, setup, and how to opt out are in REVIEWBOT.md.
 name: Review Bot
 
 on:
@@ -41,8 +29,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Anyone can comment on a public commit, so only the review bot's own comments
-      # and those of people with access to this repository reach the model.
+      # Anyone can comment on a public commit, so only the bot's own comments and
+      # those of people with access to this repository reach the model.
       - name: Collect past reviews and replies
         run: >
           gh api "repos/$GITHUB_REPOSITORY/comments" --paginate
@@ -64,14 +52,24 @@ jobs:
             missing) reason="this repository has no REVIEW_BOT_TOKEN secret." ;;
             401) reason="its token has expired or was revoked." ;;
             403) reason="its token doesn't include the model it needs." ;;
-            429) reason="your BayLeaf allowance is used up for now. This usually fixes itself within a day, with no steps needed." ;;
-            *) reason="BayLeaf didn't answer as expected (status $status). If the steps below don't help, try again later." ;;
+            429) reason="your BayLeaf allowance is used up for now. This usually fixes itself within a day." ;;
+            *) reason="BayLeaf didn't answer as expected (status $status). If setup looks right, try again later." ;;
           esac
-          sed -e "s|REASON|$reason|" -e "s|REPOSITORY|$GITHUB_REPOSITORY|" review-bot/SETUP-HELP.md > review.md
+          repo="https://github.com/$GITHUB_REPOSITORY"
+          cat > review.md <<EOF
+          **Your review bot can't review this push yet: $reason**
+
+          This comment and the red X on the **Review Bot** workflow come back on every push until you do one of two things:
+
+          - **Set up:** create a token on the [BayLeaf dashboard](https://api.bayleaf.dev/dashboard), then save it as a [secret named REVIEW_BOT_TOKEN]($repo/settings/secrets/actions/new). [REVIEWBOT.md]($repo/blob/main/REVIEWBOT.md#set-up) has the exact steps.
+          - **Opt out:** [edit the workflow]($repo/edit/main/.github/workflows/review-bot.yml) and change "if: true" to "if: false".
+
+          Your game and its other checks aren't affected.
+          EOF
         env:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
       # A push starts every workflow at once, so wait for the others and keep the
-      # logs of any that fail for the review bot to read. Empty means they all passed.
+      # logs of any that fail for the bot to read. Empty means they all passed.
       - name: Wait for this commit's other workflows
         if: steps.model.outputs.ready == 'true'
         run: |
@@ -90,11 +88,48 @@ jobs:
         run: npm install --global @opencode/cli
       - name: Review this push
         if: steps.model.outputs.ready == 'true'
-        run: opencode run --standalone --agent review-bot "Review the push from $BEFORE to $GITHUB_SHA."
+        run: >
+          opencode run --standalone --agent review-bot
+          "Read REVIEWBOT.md and follow its instructions for the bot. Review the push from $BEFORE to $GITHUB_SHA."
         env:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
+          # The model to use and what the agent may do. Everything not allowed is denied.
+          OPENCODE_CONFIG_CONTENT: |
+            {
+              "providers": {
+                "bayleaf": {
+                  "env": ["REVIEW_BOT_TOKEN"],
+                  "package": "@opencode/ai/providers/openai-compatible",
+                  "settings": { "baseURL": "https://api.bayleaf.dev/v1" },
+                  "models": {
+                    "glm": {
+                      "modelID": "openrouter:z-ai/glm-5.3-flash",
+                      "capabilities": { "tools": true, "input": ["text"], "output": ["text"] },
+                      "limit": { "context": 128000, "output": 16384 }
+                    }
+                  }
+                }
+              },
+              "agents": {
+                "review-bot": {
+                  "mode": "primary",
+                  "model": "bayleaf/glm",
+                  "steps": 30,
+                  "permissions": [
+                    { "action": "*", "resource": "*", "effect": "deny" },
+                    { "action": "read", "resource": "*", "effect": "allow" },
+                    { "action": "glob", "resource": "*", "effect": "allow" },
+                    { "action": "grep", "resource": "*", "effect": "allow" },
+                    { "action": "shell", "resource": "git log *", "effect": "allow" },
+                    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+                    { "action": "shell", "resource": "git show *", "effect": "allow" },
+                    { "action": "edit", "resource": "review.md", "effect": "allow" }
+                  ]
+                }
+              }
+            }
       - name: Check a review was written
         if: ${{ !cancelled() }}
         run: |
