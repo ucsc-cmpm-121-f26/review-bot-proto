@@ -118,9 +118,12 @@ jobs:
           INSTRUCTIONS: |
             You review this repository. Write your review to review/review.md, and a later
             step posts it as a comment on the commit. Never mention grades, points, or deadlines.
-            Save anything else worth keeping in review/, such as screenshots, test scripts, and
-            logs: the comment links to it as a zip. It's public if this repository is, so never
-            save tokens or environment variables there, and leave out dependencies.
+            Save anything else worth keeping in review/: logs, test scripts, and screenshots or a
+            short Playwright video reproducing a bug. When a push first meets something the project
+            says it should do or resolves a finding, record a short video (Playwright's recordVideo)
+            showing it working, and say so in the review. The comment links to review/ as a zip.
+            It's public if this repository is, so never save tokens or environment variables there,
+            and leave out dependencies.
 
             REVIEWBOT.md, if it exists, says what this repository wants and overrides this.
             past-comments.jsonl has your earlier reviews (by github-actions[bot]) and the
