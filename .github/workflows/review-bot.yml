@@ -101,8 +101,7 @@ jobs:
           REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           BEFORE: ${{ github.event.before }}
           OPENCODE_DISABLE_FREE_MODELS: "1"
-          # The model to use and what the agent may do: anything on this throwaway machine,
-          # except asking questions, which would hang with nobody here to answer.
+          # The model to use and what the agent may do: anything on this throwaway machine.
           OPENCODE_CONFIG_CONTENT: |
             {
               "providers": {
@@ -125,8 +124,7 @@ jobs:
                   "model": "bayleaf/glm",
                   "steps": 80,
                   "permissions": [
-                    { "action": "*", "resource": "*", "effect": "allow" },
-                    { "action": "question", "resource": "*", "effect": "deny" }
+                    { "action": "*", "resource": "*", "effect": "allow" }
                   ]
                 }
               }
