@@ -92,8 +92,15 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ github.token }}
+      # Ready-made tools, so the model spends its steps reviewing, not looking around.
+      - uses: denoland/setup-deno@v2.0.5
+        if: steps.model.outputs.ready
+        with:
+          deno-version: v2.9.7
       - if: steps.model.outputs.ready
-        run: npm install --global @opencode/cli@2.2.5
+        run: |
+          npm install --global @opencode/cli@2.2.5
+          cd ~ && npm install playwright-core && npx playwright-core install ffmpeg
       - name: Review this push
         if: steps.model.outputs.ready
         shell: bash
@@ -103,7 +110,7 @@ jobs:
           Review the push from $BEFORE to $GITHUB_SHA." | tee "$RUNNER_TEMP/events.jsonl"
           # The footer is measured here, not written by the model.
           if [ -s review/review.md ]; then
-            jq -rs --arg harness "OpenCode $(opencode --version)" \
+            jq -rs --arg harness "$(opencode --version)" \
               '[.[] | select(.type == "step_finish").part] |
               "\n\n---\n<sub>\($harness) · openrouter:z-ai/glm-5.3-flash · \(length) steps · $\(map(.cost) | add | . * 10000 | round / 10000) API spend</sub>"' \
               "$RUNNER_TEMP/events.jsonl" >> review/review.md
@@ -128,8 +135,10 @@ jobs:
             step posts it, as plain Markdown text, as a comment on the commit.
 
             What you have:
-            - A throwaway machine where you may do anything: run the project, install tools,
-              drive a headless browser, record video with Playwright, and browse the web.
+            - A throwaway machine where you may do anything, including installing tools and
+              browsing the web. Deno, Node, and Chrome are ready, with playwright-core and ffmpeg
+              in ~/node_modules: write Playwright scripts under ~, launch with channel: "chrome",
+              and recordVideo works. Don't spend steps checking for these.
             - past-comments.jsonl: earlier reviews (by github-actions[bot]) and replies from
               people with access to this repository.
             - ci-output.txt: failure logs from this commit's other workflows, if any.
