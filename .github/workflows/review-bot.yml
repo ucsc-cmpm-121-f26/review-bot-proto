@@ -156,6 +156,8 @@ jobs:
             - End with a table of findings: ID, status, first seen commit, note. Keep IDs across
               reviews, and take replies seriously.
             - Save a short video that reproduces a bug, or shows something working for the first time.
+            - If you save files, list the interesting ones in a line or two, saying what each shows.
+              Don't list review.md.
             - Never mention grades, points, or deadlines.
       - uses: actions/upload-artifact@v4
         id: upload
